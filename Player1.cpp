@@ -35,33 +35,32 @@ struct Unit
 class Stopper;
 
 //GLOBAL VARIABLE
-long enemyGold = 0;
-long playerGold = 0;
-double player_remaining_time = 0;
-double enemy_remaining_time = 0;
+long gold = 0;
+double player1_remaining_time = 0;
+double player2_remaining_time = 0;
 
 //FUNCTION DECLARATION
 
 //ACCESSORS
 std::vector<int> getAllID(std::vector<Unit> units);
 std::vector<std::pair<int, int>> getAllEnemyPositionsUnits(std::vector<Unit> units);
-int getDistanceOfEntinty(int id, std::vector<Unit>& units);
-int getResilienceOfEntity(int id, std::vector<Unit> units);
+int getDistanceOfEntinty(const int id, std::vector<Unit>& units);
+int getResilienceOfEntity(const int id, std::vector<Unit> units);
 char getTypeOfEntity(const int id, std::vector<Unit> units);
 std::pair<int, int> getPositionOfStructOnMap(char num, std::vector<std::vector<char>> map);
 int getMaxUnitID(const std::vector<Unit> units);
 int GetNumberWorkersInMine(std::vector<Unit> units, std::vector<std::vector<char>> map);
-int getAttackRangeOfEntity(int id, std::vector<Unit> units);
-std::pair<int, int> getPositionOfUnitOfID(int id, std::vector<Unit> units);
+int getAttackRangeOfEntity(const int id, std::vector<Unit> units);
+std::pair<int, int> getPositionOfUnitOfID(const int id, std::vector<Unit> units);
 
 //ORDERS FUNCTIONS
 void getAction(std::vector<std::vector<char>> map, std::vector<Unit>& units, std::vector<actionLine>& actions);
 
-bool isEntityFriendly(std::vector<Unit> units, int id);
-bool isIDExistent(std::vector<Unit> units, int id);
-bool isAttackCorrect(std::vector<Unit>& units, int enemyId, int friendlyId);
-bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, int newPosX, int newPosY, int id);
-bool isCreatingCorrect(std::vector<Unit>& units, char type, int id);
+bool isEntityFriendly(std::vector<Unit> units, const int id);
+bool isIDExistent(std::vector<Unit> units, const int id);
+bool isAttackCorrect(std::vector<Unit>& units, const int enemyId, const int friendlyId);
+bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, const int newPosX, const int newPosY, const int id);
+bool isCreatingCorrect(std::vector<Unit>& units, const char type, const int id);
 
 //REGULAR FUNCTIONS
 Unit specifyUnit(std::vector<Unit>& units, char type, char affilation = 'P');
@@ -69,25 +68,26 @@ void showMap(const std::vector<std::vector<char>>& map);
 
 //LOADING FUNCTIONS
 std::vector<std::vector<char>> loadMapFile(const std::string& filename);
-void loadStatusFile(const std::string& filename, std::vector<Unit>& units,     std::vector<std::vector<char>> map);
+void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::vector<std::vector<char>> map);
+double loadAuxiliaryFile(const std::string& filename);
 
 //SAVE FUNCTIONS
 void saveStatusFile(const std::string filename, const std::vector<Unit> units);
 void saveActionsFile(const std::string& filename, const std::vector<actionLine> actions);
+void saveAuciliaryFile(const std::string& filename, double value);
 
 class Stopper 
 {
 private:
-    std::chrono::steady_clock::time_point start; // Czas rozpocz�cia stopera
-    std::chrono::duration<double> remaining_time; // Pozosta�y czas w sekundach
+    std::chrono::steady_clock::time_point start;
+    std::chrono::duration<double> remaining_time;
     std::chrono::duration<double> elapsed;
-    bool running; // Flaga okre�laj�ca, czy stoper jest w��czony
+    bool running;
     char type;
     const int baseID;
 public:
     Stopper(const int baseID) : running(false), baseID(baseID) {}
 
-    // W��czenie stopera na okre�lony czas w sekundach
     void startTimer(double time) 
     {
         start = std::chrono::steady_clock::now();
@@ -95,17 +95,15 @@ public:
         running = true;
     }
 
-    // Sprawdzenie, czy stoper jest w��czony
-    bool isRunning() {
+    bool isRunning() 
+    {
         return running;
     }
 
-    // Aktualizacja pozosta�ego czasu
     void update(std::vector<Unit>& units, std::vector<std::vector<char>> map) 
     {
         if (running) 
         {
-            //std::cout<<"Update\n";
             std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
             elapsed = currentTime - start;
 
@@ -121,26 +119,23 @@ public:
                 units[baseID].unitToBuild = '0';
                 if(baseID == 0)
                 {                
-                    player_remaining_time = 0;
+                    player1_remaining_time = 0;
                 }
                 else if(baseID == 1)
                 {                
-                    enemy_remaining_time = 0;
+                    player2_remaining_time = 0;
                 }
-                std::cout << "Unit created by stopper\n";
                     
             }
         }
     }
 
-    // Zatrzymanie stopera
     void stopTimer() 
     {
         running = false;
         remaining_time = std::chrono::duration<double>(0.0);
     }
 
-    // Pobranie pozosta�ego czasu w sekundach
     double getRemainingTime() 
     {
         return elapsed.count();
@@ -150,6 +145,7 @@ public:
 //MAIN FUNCITON
 int main(int argc, char* argv[])
 {
+
     std::string mapFile = argv[1];
     std::string statusFile = argv[2];
     std::string ordersFile = argv[3];
@@ -174,15 +170,17 @@ int main(int argc, char* argv[])
     std::vector<Unit> units;
     std::vector<actionLine> actions;
     loadStatusFile(statusFile, units, map);
+    player1_remaining_time = loadAuxiliaryFile("Player.txt");
+    player2_remaining_time = loadAuxiliaryFile("Enemy.txt");
 
     Stopper playerStopper(0);
     Stopper enemyStopper(1);
 
     //start timer if base has unit to build
     if(units[0].unitToBuild != '0')
-        playerStopper.startTimer(player_remaining_time);
+        playerStopper.startTimer(player1_remaining_time);
     if(units[1].unitToBuild != '0')
-        enemyStopper.startTimer(enemy_remaining_time);
+        enemyStopper.startTimer(player2_remaining_time);
 
     std::chrono::steady_clock::time_point program_start = std::chrono::steady_clock::now();
 
@@ -191,15 +189,15 @@ int main(int argc, char* argv[])
         {
             std::this_thread::sleep_for(std::chrono::seconds(time));
             if (playerStopper.isRunning())
-                player_remaining_time = playerStopper.getRemainingTime();
+                player1_remaining_time = playerStopper.getRemainingTime();
             if (enemyStopper.isRunning())
-                enemy_remaining_time = enemyStopper.getRemainingTime();
+                player2_remaining_time = enemyStopper.getRemainingTime();
 
-            playerGold += GetNumberWorkersInMine(units, map) * 60;
-            std::remove("status.txt");
+            gold += GetNumberWorkersInMine(units, map) * 60;
             saveStatusFile("status.txt", units);
-            std::remove("rozkazy.txt");
             saveActionsFile("rozkazy.txt", actions);
+            saveAuciliaryFile("Player.txt", player1_remaining_time);
+            saveAuciliaryFile("Enemy.txt", player2_remaining_time);
 
             std::exit(0);
         });
@@ -223,13 +221,12 @@ int main(int argc, char* argv[])
     while (true) 
     {
         getAction(map, units, actions);
-
-
     }
     return 0;
 }
 
 //ACCESSORS
+
 std::vector<int> getAllID(std::vector<Unit> units)
 {
     /*
@@ -237,7 +234,8 @@ std::vector<int> getAllID(std::vector<Unit> units)
     */
     std::vector<int> ids;
 
-    for (auto& unit : units) {
+    for (auto& unit : units) 
+    {
         ids.push_back(unit.id);
     }
     return ids;
@@ -245,15 +243,15 @@ std::vector<int> getAllID(std::vector<Unit> units)
 std::vector<std::pair<int, int>> getAllEnemyPositionsUnits(std::vector<Unit> units)
 {
     std::vector<std::pair<int, int>> enemyPosition;
-    for (auto& position : units)
+    for (auto& unit : units)
     {
-        if (position.affiliation == 'E')
-            enemyPosition.push_back(std::make_pair(position.x, position.y));
+        if (unit.affiliation == 'E')
+            enemyPosition.push_back(std::make_pair(unit.x, unit.y));
     }
     return enemyPosition;
 
 }
-int getDistanceOfEntinty(int id, std::vector<Unit>& units)
+int getDistanceOfEntinty(const int id, std::vector<Unit>& units)
 {
     for (const auto& unit : units)
     {
@@ -264,7 +262,7 @@ int getDistanceOfEntinty(int id, std::vector<Unit>& units)
     }
     return -1;
 }
-int getResilienceOfEntity(int id, std::vector<Unit> units)
+int getResilienceOfEntity(const int id, std::vector<Unit> units)
 {
     for (const auto& unit : units)
     {
@@ -286,7 +284,7 @@ char getTypeOfEntity(const int id, std::vector<Unit> units)
     }
     return '0';
 }
-std::pair<int, int> getPositionOfStructOnMap(char num, std::vector<std::vector<char>> map)
+std::pair<int, int> getPositionOfStructOnMap(const char num, std::vector<std::vector<char>> map)
 {
     /*
     RETURN POSITION OF ENTERED NUM
@@ -305,7 +303,8 @@ std::pair<int, int> getPositionOfStructOnMap(char num, std::vector<std::vector<c
     // IF THERE IS NOT STRUCT OF ENTERED ID RETURN (-1, -1)
     return std::make_pair(-1, -1);
 }
-int getMaxUnitID(const std::vector<Unit> units) {
+int getMaxUnitID(const std::vector<Unit> units) 
+{
     int maxID = -1;
 
     for (const Unit& unit : units) {
@@ -325,7 +324,7 @@ int GetNumberWorkersInMine(std::vector<Unit> units, std::vector<std::vector<char
     for (const auto& unit : units)
     {
         if (
-            isEntityFriendly(units, unit.id) && getTypeOfEntity(unit.id, units) == 'W' &&
+            unit.affiliation == 'P' && getTypeOfEntity(unit.id, units) == 'W' &&
             unit.x == getPositionOfStructOnMap('6', map).first && unit.y == getPositionOfStructOnMap('6', map).second &&
             getResilienceOfEntity(unit.id, units) > 0
             )
@@ -335,7 +334,7 @@ int GetNumberWorkersInMine(std::vector<Unit> units, std::vector<std::vector<char
     }
     return workersInMine;
 }
-int getAttackRangeOfEntity(int id, std::vector<Unit> units)
+int getAttackRangeOfEntity(const int id, std::vector<Unit> units)
 {
     for (const auto& unit : units)
     {
@@ -346,7 +345,7 @@ int getAttackRangeOfEntity(int id, std::vector<Unit> units)
     }
     return 0;
 }
-std::pair<int, int> getPositionOfUnitOfID(int id, std::vector<Unit> units)
+std::pair<int, int> getPositionOfUnitOfID(const int id, std::vector<Unit> units)
 {
     for (const auto& unit : units)
     {
@@ -366,7 +365,7 @@ void getAction(std::vector<std::vector<char>> map, std::vector<Unit>& units,std:
     */
     std::string line;
     bool error = false;
-    std::cout << "pass comand: \n";
+    std::cout << "Pass comand: \n";
 
     std::getline(std::cin, line);
     
@@ -473,7 +472,7 @@ void getAction(std::vector<std::vector<char>> map, std::vector<Unit>& units,std:
             actions.push_back(actionLine);
 }
 
-bool isEntityFriendly(std::vector<Unit> units, int id)
+bool isEntityFriendly(std::vector<Unit> units, const int id)
 {
     /*
     CHECK IF ENTITY OF ENTERED ID IS FRIENDLY. RETURN TRUE IF IT IS AND IN THE OPPOSITE CASE RETURN FALSE
@@ -487,7 +486,7 @@ bool isEntityFriendly(std::vector<Unit> units, int id)
     }
     return false;
 }
-bool isIDExistent(std::vector<Unit> units, int id)
+bool isIDExistent(std::vector<Unit> units, const int id)
 {
     /*
     CHECKS IF ENTITY OF GIVEN ID 
@@ -499,7 +498,7 @@ bool isIDExistent(std::vector<Unit> units, int id)
     }
     return false;
 }
-bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, int newPosX, int newPosY, int id)
+bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, const int newPosX, const int newPosY, const int id)
 {
     if (newPosX < 0 || newPosX >= map[0].size() ||     //warunek sprawdzaj�cy czy nowa pozycja jednostki nie wychodzi poza map�
         newPosY < 0 || newPosY >= map.size() ||
@@ -507,21 +506,16 @@ bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, 
         map[newPosX][newPosY] == '2' ||
         std::abs(getPositionOfUnitOfID(id, units).first - newPosX) + std::abs(getPositionOfUnitOfID(id, units).second - newPosY) > getDistanceOfEntinty(id, units) || 
         getResilienceOfEntity(id, units) < 0 ||
-        getTypeOfEntity(id, units) == 'B'
-        )
+        getTypeOfEntity(id, units) == 'B')
     {
         return false;
-        std::cout << "False\n";
     }
 
     for (int i = 0; i < getAllEnemyPositionsUnits(units).size(); i++)
-        if(
-            newPosX == getAllEnemyPositionsUnits(units)[i].first && //warunek sprawdza czy nowa pozycja jednostki nie jest zaj�ta przez jednost� przeciwnika
-            newPosY == getAllEnemyPositionsUnits(units)[i].second
-          )
+        if(newPosX == getAllEnemyPositionsUnits(units)[i].first && //warunek sprawdza czy nowa pozycja jednostki nie jest zaj�ta przez jednost� przeciwnika
+            newPosY == getAllEnemyPositionsUnits(units)[i].second)
         {
             return false;
-            std::cout << "False\n";
         }
 
     //update distance after move
@@ -536,7 +530,7 @@ bool isMoveCorrect(std::vector<std::vector<char>> map, std::vector<Unit> units, 
     return true;
     
 }
-bool isAttackCorrect(std::vector<Unit>& units, int friendlyId, int enemyId)
+bool isAttackCorrect(std::vector<Unit>& units, const int friendlyId, const int enemyId)
 {
     /*
     THIS FUNCTION CHECKS MAKE A DECISSION IF ATTACK IS CORRECT
@@ -573,28 +567,28 @@ bool isAttackCorrect(std::vector<Unit>& units, int friendlyId, int enemyId)
 
     return true;
 }
-bool isCreatingCorrect(std::vector<Unit>& units, char type, int id)
+bool isCreatingCorrect(std::vector<Unit>& units, const char type, const int id)
 {
     /*FINAL FUNCTIONS CHECKS IF BUILDING IS CORRECT
     */
         
-    if (units[0].building == true || playerGold < specifyUnit(units, type).cost || getTypeOfEntity(id, units) != 'B' || type == 'B')
+    if (units[0].building == true || gold < specifyUnit(units, type).cost || getTypeOfEntity(id, units) != 'B' || type == 'B')
     {
         return false;
     }
     else
     {
-        playerGold -= specifyUnit(units, type).cost;
+        gold -= specifyUnit(units, type).cost;
         units[0].building = true;
         units[0].unitToBuild = type;
-        player_remaining_time = specifyUnit(units, type).builindTime;
+        player1_remaining_time = specifyUnit(units, type).builindTime;
         return true;
     }
     return true;
 }
 
 //REGULAR FUNCTIONS
-Unit specifyUnit(std::vector<Unit>& units, char type, char affilation)
+Unit specifyUnit(std::vector<Unit>& units, const char type, const char affilation)
 {
     if ((type == 'K' || type == 'S' || type == 'A' || type == 'P' || type == 'R' || type == 'C' || type == 'W') && 
         (affilation == 'P' || affilation == 'E'))
@@ -705,7 +699,27 @@ std::vector<std::vector<char>> loadMapFile(const std::string& filename)
         in_file.close();
         std::cerr << "FILE " << filename << " LOADED." << std::endl;
     }
-
+    else
+    {
+        std::cerr << "ERROR::COULD NOT OPEN " << filename << ". MAKING DEFAULT MAP... " << std::endl;
+        map = {
+            {'1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'6', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '6', '0', '9', '9', '9', '9', '9', '0', '0', '6', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '9', '9', '9', '9', '9', '0', '0', '0', '0', '0', '6'},
+            {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'},
+            {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '2'}
+        };
+    }
     return map;
 }
 void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::vector<std::vector<char>> map)
@@ -718,7 +732,7 @@ void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::
     if (in_file.is_open())
     {
         Unit unit;
-        in_file >> playerGold >> enemyGold >> player_remaining_time >> enemy_remaining_time;
+        in_file >> gold;
         while (in_file >> unit.affiliation >> unit.type >> unit.id >> unit.x >> unit.y >> unit.resilience)
         {
             if (unit.type == 'K')
@@ -786,8 +800,7 @@ void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::
     {
         Unit unit;
         std::cerr << "ERROR::COULD NOT OPEN FILE " << filename << ". MAKING DEFAULT STATUS FILE... " << std::endl;
-        playerGold = 2000;
-        enemyGold = 2000;
+        gold = 2000;
         unit.affiliation = 'P';
         unit.type = 'B';
         unit.id = 0;
@@ -805,7 +818,23 @@ void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::
 
     
 }
+double loadAuxiliaryFile(const std::string& filename)
+{
+    std::ifstream file(filename);
+    double value = 0.0;
 
+    if (file.is_open())
+    {
+        file >> value;
+        file.close();
+    }
+    else
+    {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+    }
+
+    return value;
+}
 //SAVE FUNCTIONS
 void saveStatusFile(std::string filename, const std::vector<Unit> units)
 {
@@ -821,7 +850,7 @@ void saveStatusFile(std::string filename, const std::vector<Unit> units)
     out_file.open(filename);
     if (out_file.is_open())
     {
-        out_file << playerGold << " " << enemyGold << " " << player_remaining_time << " " << enemy_remaining_time << std::endl;
+        out_file << gold << std::endl;
         for (auto& unit : units)
         {
             out_file << unit.affiliation << " " << unit.type << " " << unit.id << " " << unit.x << " " << unit.y << " " << unit.resilience;
@@ -877,4 +906,18 @@ void saveActionsFile(const std::string& filename, const std::vector<actionLine> 
     else
         std::cout << "ERROR::SAVEACTIONS::Could not save to file::FILENAME: " << filename << std::endl;
     out_file.close();
+}
+void saveAuciliaryFile(const std::string& filename, double value)
+{
+    std::ofstream file(filename);
+
+    if (file.is_open())
+    {
+        file << value;
+        file.close();
+    }
+    else
+    {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+    }
 }

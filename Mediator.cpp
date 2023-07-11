@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <thread>
 #include <unordered_map>
+#include <cstdlib>
+#include <limits.h>
 //STRUCTURES
 struct Unit
 {
@@ -45,10 +47,8 @@ std::unordered_map<char, std::unordered_map<char, int>> attackTable =
 };
 
 //GLOBAL VARIABLES
-long enemyGold;
-long playerGold;
-double player_remaining_time = 0;
-double enemy_remaining_time = 0;
+long player1Gold;
+long player2Gold;
 
 //ACCESSORS
 char getType(std::vector<Unit>& units, int id);
@@ -56,18 +56,20 @@ void getNumberOfUnitsByAffiliation(std::vector<Unit>& units, int& playerUnits, i
 int getMaxUnitID(const std::vector<Unit> units);
 int getResilienceOfEntity(int id, std::vector<Unit> units);
 int getAttackValue(const char attacker, const char defender);
+std::string getCurrentDirectory();
 
 //LOAD FUNCTIONS
-void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::vector<std::vector<char>>& map);
+bool loadStatusFile(const std::string& filename, std::vector<Unit>& units, int goldOption);
 void loadActions(const std::string filename, std::vector<actionLine>& actions);
 int loadEndGameInfo(std::string filename);
 std::vector<std::vector<char>> loadMapFile(const std::string& filename);
 
 //SAVE FUNCTIONS
-void saveStatusFile(std::string filename, const std::vector<Unit> units);
+void saveStatusFile(std::string filename, const std::vector<Unit> units, int goldOption);
 void saveEndGameInfo(std::string filename, int tour);
 
 //REGULAR FUNCTIONS
+void reverseAffiliation(std::vector<Unit>& units); //Auxiliary function to prepere status file depending on the player
 void runPlayerProgram(const std::string& player, const std::string& mapFile, const std::string& statusFile, const std::string& ordersFile, const std::string& timeLimit);
 void followOrders(std::vector<actionLine> actions, std::vector<Unit>& units);
 
@@ -92,30 +94,61 @@ int main(int argc, char* argv[])
     std::string statusFile = argv[3];
     std::string ordersFile = argv[4];
 
+    std::string currentDirectory = getCurrentDirectory();
+    std::string player1Path = currentDirectory + "/player1";
+    std::string player2Path = currentDirectory + "/player2";
     int tour = loadEndGameInfo("endGame.txt"); //endGame.txt contains number of tours
     map = loadMapFile(mapFile);
 
+
     if(tour < 2000)
     {    
+        //prepere status file depending on the player
+        if(loadStatusFile(statusFile, units, 3))
+        {            
+            if(player == player1Path)
+            {
+                saveStatusFile(statusFile, units, 1);
+            }
+            else if(player == player2Path)
+            {
+                reverseAffiliation(units);
+                saveStatusFile(statusFile, units, 2);
+            } 
+        }  
+        //run player program with correct status file
         runPlayerProgram(player, mapFile, statusFile, ordersFile, timeLimit);
         loadActions(ordersFile, actions);
-        loadStatusFile(statusFile, units, map);
 
-         //CHECK IF PLAYER BASE IS DESTROYED
+
+        //Depending on which program was called, the status file should be loaded correctly.
+        units.clear();
+        if(player == player1Path)
+        {
+            loadStatusFile(statusFile, units, 1); 
+        }
+        if(player == player2Path)
+        {
+            loadStatusFile(statusFile, units, 2); 
+            reverseAffiliation(units);
+        }
+
+        
+         //CHECK IF PLAYER1 BASE IS DESTROYED
         if(units[0].resilience <= 0)
         {
-            std::cout<<"Enemy Wins\n";
+            std::cout<<"Player2 Wins\n";
             return 0;
         }
-        //CHECK IF ENEMY BASE IS DESTROYED
+        //CHECK IF Player2 BASE IS DESTROYED
         else if(units[1].resilience <= 0)
         {   
-            std::cout<<"Player Wins!\n";
+            std::cout<<"Player1 Wins!\n";
             return 0;
         }
-       
         followOrders(actions, units);
-        saveStatusFile(statusFile, units);
+
+        saveStatusFile(statusFile, units, 3);
         //INCREASE TOUR AND SAVE TO FILE
         tour++;
         remove("endGame.txt");
@@ -126,16 +159,16 @@ int main(int argc, char* argv[])
         std::cout << "END GAME::GAME RUNS TO LONG\n";
         int playerUnits = 0;
         int enemyUnits = 0;
-        loadStatusFile(statusFile, units, map);
+        loadStatusFile(statusFile, units, 3);
         getNumberOfUnitsByAffiliation(units, playerUnits, enemyUnits);
         if(playerUnits > enemyUnits)
         {
     
-            std::cout<<"Player Wins!\n" << "Player has " << playerUnits <<" units\n" << "Enemy has " <<  enemyUnits << " units\n" ;
+            std::cout<<"Player1 Wins!\n" << "Player1 has " << playerUnits <<" units\n" << "Player2 has " <<  enemyUnits << " units\n" ;
         }
         else if(enemyUnits > playerUnits)
             {
-                std::cout<<"Enemy Wins!\n" << "Player has " << playerUnits <<" units\n" << "Enemy has " <<  enemyUnits << " units\n" ;
+                std::cout<<"Player2 Wins!\n" << "Player1 has " << playerUnits <<" units\n" << "Player2 has " <<  enemyUnits << " units\n" ;
             }
         else
             std::cout<<"Remis\n";
@@ -208,17 +241,44 @@ int getAttackValue(const char attacker, const char defender)
         return 0;
     }
 }
+std::string getCurrentDirectory()
+{
+    char buffer[PATH_MAX];
+    if (getcwd(buffer, sizeof(buffer)) != nullptr)
+    {
+        return std::string(buffer);
+    }
+    else
+    {
+        // Obsługa błędu w przypadku niepowodzenia getcwd()
+        // np. zwrócenie domyślnej ścieżki
+        return "";
+    }
+}
+
 //LOAD FUNCTIONS
-void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::vector<std::vector<char>>& map)
+bool loadStatusFile(const std::string& filename, std::vector<Unit>& units, int goldOption)
 {
     /*
     LOAD STATUS OF ALL UNITS TO VECTOR, THIS VECTOR HELPS TO MANAGE OF UNITS
     */
+   
     std::ifstream in_file(filename);
     if (in_file.is_open())
     {
         Unit unit;
-        in_file >> playerGold >> enemyGold >> player_remaining_time >> enemy_remaining_time;
+        if (goldOption == 1) // Odczytaj tylko player1Gold
+        {
+            in_file >> player1Gold;
+        }
+        else if (goldOption == 2) // Odczytaj tylko player2Gold
+        {
+            in_file >> player2Gold;
+        }
+        else if (goldOption == 3) // Odczytaj player1Gold i player2Gold
+        {
+            in_file >> player1Gold >> player2Gold;
+        }
         while (in_file >> unit.affiliation >> unit.type >> unit.id >> unit.x >> unit.y >> unit.resilience)
         {
             if (unit.type == 'K')
@@ -278,7 +338,15 @@ void loadStatusFile(const std::string& filename, std::vector<Unit>& units, std::
             }
             units.push_back(unit);
         }
+        
         in_file.close();
+        return true;
+    }
+    else
+    {
+        player1Gold = 2000;
+        player2Gold = 2000;
+        return false;
     }
 
     
@@ -385,7 +453,7 @@ std::vector<std::vector<char>> loadMapFile(const std::string& filename)
 }
 
 //SAVE FUNCTIONS
-void saveStatusFile(std::string filename, const std::vector<Unit> units)
+void saveStatusFile(std::string filename, const std::vector<Unit> units, int goldOption) //gold option: 1 - save only Player1Gold, 2 - save only Player2Gold, 3- save both
 {
     /*
     Save status file and save the entire units to text - file
@@ -399,7 +467,18 @@ void saveStatusFile(std::string filename, const std::vector<Unit> units)
     out_file.open(filename);
     if (out_file.is_open())
     {
-        out_file << playerGold << " " << enemyGold << " " << player_remaining_time << " " << enemy_remaining_time <<  std::endl;
+        if (goldOption == 1) // Zapisz tylko player1Gold
+        {
+            out_file << player1Gold << std::endl;
+        }
+        else if (goldOption == 2) // Zapisz tylko player2Gold
+        {
+            out_file << player2Gold << std::endl;
+        }
+        else if (goldOption == 3) // Zapisz player1Gold i player2Gold
+        {
+            out_file << player1Gold << " " << player2Gold << std::endl;
+        }
         for (auto& unit : units)
         {
             out_file << unit.affiliation << " " << unit.type << " " << unit.id << " " << unit.x << " " << unit.y << " " << unit.resilience;
@@ -426,6 +505,20 @@ void saveEndGameInfo(std::string filename, int tour)
 }
 
 //REGULAR FUNCTIONS
+void reverseAffiliation(std::vector<Unit>& units)
+{
+    for(auto& unit: units)
+    {
+        if(unit.affiliation == 'P')
+        {
+            unit.affiliation = 'E';
+        }
+        else if(unit.affiliation == 'E')
+        {
+            unit.affiliation = 'P';
+        }
+    }
+}
 void runPlayerProgram(const std::string& player, const std::string& mapFile, const std::string& statusFile, const std::string& ordersFile, const std::string& timeLimit)
 {
     std::string command = player + " " + mapFile + " " + statusFile + " " + ordersFile + " " + timeLimit;

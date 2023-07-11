@@ -1,8 +1,8 @@
 all: 
 		g++ Mediator.cpp -o mediator
-		g++ Player.cpp -o player
-		g++ Enemy.cpp -o enemy
+		g++ Player1.cpp -o player1
+		g++ Player2.cpp -o player2
 runPlayer:
-		./mediator $(shell pwd)/player map.txt status.txt rozkazy.txt 10
+		./mediator $(shell pwd)/player1 map.txt status.txt rozkazy.txt 10
 runEnemy:
-		./mediator $(shell pwd)/enemy map.txt status.txt rozkazy.txt 10
+		./mediator $(shell pwd)/player2 map.txt status.txt rozkazy.txt 10
